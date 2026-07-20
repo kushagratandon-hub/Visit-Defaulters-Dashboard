@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D-1 Defaulters — DCF</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f6f9fd;
+    --panel-2:#eaf1fb;
+    --line:#d7e3f4;
+    --text:#132139;
+    --muted:#5b6b85;
+    --accent:#2563eb;
+    --accent-dim:#dbe9ff;
+    --danger:#dc2626;
+    --danger-dim:#fde2e2;
+    --warn:#c2760a;
+    --warn-dim:#fdecd1;
+    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{padding:20px 20px 60px;}
+  a{color:var(--accent);}
+
+  .topbar{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;
+    margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;flex-direction:column;gap:4px;}
+  .brand .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+  }
+  .brand h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-0.01em;}
+  .meta{
+    display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted);
+  }
+  .meta span b{color:var(--text);font-weight:600;}
+  .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;box-shadow:0 0 6px var(--accent);}
+  .status-dot.err{background:var(--danger);box-shadow:0 0 6px var(--danger);}
+  .status-dot.load{background:var(--warn);box-shadow:0 0 6px var(--warn);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  }
+  .kpi .n{font-size:26px;font-weight:700;font-family:var(--mono);line-height:1;}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;}
+  .kpi.bad .n{color:var(--danger);}
+  .kpi.warn .n{color:var(--warn);}
+  .kpi.good .n{color:var(--accent);}
+
+  .tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .tab-btn{
+    background:transparent;border:none;color:var(--muted);font-family:var(--sans);font-size:13px;font-weight:600;
+    padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;
+  }
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  }
+  .panel-head{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+    padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel-2);
+  }
+  .panel-head h2{margin:0;font-size:14px;font-weight:700;}
+  .panel-head .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  input[type=text]{
+    background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:7px;
+    padding:7px 10px;font-size:12px;font-family:var(--mono);min-width:180px;
+  }
+  input[type=text]:focus{outline:none;border-color:var(--accent);}
+  select{
+    background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:7px;
+    padding:7px 10px;font-size:12px;font-family:var(--sans);
+  }
+  .btn{
+    background:var(--bg);border:1px solid var(--line);color:var(--muted);border-radius:7px;
+    padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--sans);font-weight:600;
+  }
+  .btn:hover{color:var(--text);border-color:var(--accent);}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;padding:10px 14px;color:var(--muted);font-weight:600;text-transform:uppercase;
+    font-size:10.5px;letter-spacing:.06em;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+    white-space:nowrap;position:sticky;top:0;background:var(--panel-2);
+  }
+  thead th:hover{color:var(--text);}
+  thead th .arrow{opacity:.4;margin-left:4px;font-size:9px;}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  tbody tr:hover{background:var(--panel-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  .num{font-family:var(--mono);text-align:right;}
+  .zero{color:var(--danger);font-weight:700;}
+  .nonzero{color:var(--text);}
+  .pill{
+    display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-family:var(--mono);font-weight:700;
+  }
+  .pill.bad{background:var(--danger-dim);color:var(--danger);}
+  .pill.warn{background:var(--warn-dim);color:var(--warn);}
+  .pill.good{background:var(--accent-dim);color:var(--accent);}
+
+  .table-wrap{max-height:65vh;overflow:auto;}
+
+  .scenario-row{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .scenario-card{
+    background:var(--panel);padding:14px 16px;cursor:pointer;transition:.15s;
+  }
+  .scenario-card:hover{background:var(--panel-2);}
+  .scenario-card.active-filter{background:var(--panel-2);box-shadow:inset 0 -2px 0 var(--accent);}
+  .scenario-card .sc-n{font-size:22px;font-weight:700;font-family:var(--mono);line-height:1;color:var(--text);}
+  .scenario-card.danger .sc-n{color:var(--danger);}
+  .scenario-card.ok .sc-n{color:var(--accent);}
+  .scenario-card .sc-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:6px;}
+  .scenario-card .sc-sub{display:block;font-size:10px;color:var(--muted);text-transform:none;letter-spacing:0;margin-top:2px;font-family:var(--mono);}
+  @media (max-width:640px){
+    .scenario-row{grid-template-columns:repeat(2,1fr);}
+  }
+  .empty-state{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .foot-note{margin-top:6px;padding:10px 14px;font-size:11px;color:var(--muted);font-family:var(--mono);}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+
+  @media (max-width:640px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    thead th, tbody td{padding:8px 10px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="eyebrow">DCF · Field Ops</div>
+    <h1>D-1 Defaulters</h1>
+  </div>
+  <div class="meta">
+    <span id="statusLine"><span class="status-dot load" id="statusDot"></span><span id="statusText">Loading live sheet…</span></span>
+    <span>Data as of: <b id="dataAsOf">—</b></span>
+    <span>Last refreshed: <b id="lastRefreshed">—</b></span>
+  </div>
+</div>
+
+<div class="kpis" id="kpiRow">
+  <div class="kpi"><div class="n" id="kpiTotal">—</div><div class="l">Total FOS</div></div>
+  <div class="kpi bad"><div class="n" id="kpiZeroVisits">—</div><div class="l">Zero Visits</div></div>
+  <div class="kpi warn"><div class="n" id="kpiZeroLeads">—</div><div class="l">Zero Leads</div></div>
+  <div class="kpi bad"><div class="n" id="kpiZeroBoth">—</div><div class="l">Zero Visits + Zero Leads</div></div>
+  <div class="kpi good"><div class="n" id="kpiTotalVisits">—</div><div class="l">Total Visits</div></div>
+  <div class="kpi good"><div class="n" id="kpiTotalLeads">—</div><div class="l">Total Leads</div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="rsm">RSM Level Summary</button>
+  <button class="tab-btn" data-tab="sm">SM Level Summary</button>
+  <button class="tab-btn" data-tab="fos">FOS — Zero Visits</button>
+  <button class="tab-btn" data-tab="foslist">FOS List</button>
+</div>
+
+<!-- RSM TAB -->
+<div class="panel tab-content" id="tab-rsm">
+  <div class="panel-head">
+    <div>
+      <h2>RSM Level Summary</h2>
+      <div class="sub">Aggregated across all FOS reporting into each RSM</div>
+    </div>
+    <div class="controls">
+      <input type="text" id="rsmSearch" placeholder="Search RSM…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="rsmTable">
+      <thead>
+        <tr>
+          <th data-key="rsm">RSM<span class="arrow"></span></th>
+          <th data-key="fosCount" class="num">FOS Count<span class="arrow"></span></th>
+          <th data-key="totalVisits" class="num">Total Visits<span class="arrow"></span></th>
+          <th data-key="totalLeads" class="num">Total Leads<span class="arrow"></span></th>
+          <th data-key="zeroVisits" class="num">Zero Visits<span class="arrow"></span></th>
+          <th data-key="zeroLeads" class="num">Zero Leads<span class="arrow"></span></th>
+          <th data-key="zeroBoth" class="num">Zero Both<span class="arrow"></span></th>
+          <th data-key="zeroVisitsPct" class="num">% Zero Visits<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="rsmBody"></tbody>
+    </table>
+  </div>
+  <div class="foot-note" id="rsmFootNote"></div>
+</div>
+
+<!-- SM TAB -->
+<div class="panel tab-content" id="tab-sm" style="display:none;">
+  <div class="panel-head">
+    <div>
+      <h2>SM Level Summary</h2>
+      <div class="sub">Aggregated across all FOS reporting into each Sales Manager</div>
+    </div>
+    <div class="controls">
+      <select id="smRsmFilter"><option value="">All RSMs</option></select>
+      <input type="text" id="smSearch" placeholder="Search SM…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="smTable">
+      <thead>
+        <tr>
+          <th data-key="sm">SM<span class="arrow"></span></th>
+          <th data-key="rsm">RSM<span class="arrow"></span></th>
+          <th data-key="fosCount" class="num">FOS Count<span class="arrow"></span></th>
+          <th data-key="totalVisits" class="num">Total Visits<span class="arrow"></span></th>
+          <th data-key="totalLeads" class="num">Total Leads<span class="arrow"></span></th>
+          <th data-key="zeroVisits" class="num">Zero Visits<span class="arrow"></span></th>
+          <th data-key="zeroLeads" class="num">Zero Leads<span class="arrow"></span></th>
+          <th data-key="zeroBoth" class="num">Zero Both<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="smBody"></tbody>
+    </table>
+  </div>
+  <div class="foot-note" id="smFootNote"></div>
+</div>
+
+<!-- FOS ZERO VISITS TAB -->
+<div class="panel tab-content" id="tab-fos" style="display:none;">
+  <div class="panel-head">
+    <div>
+      <h2>FOS with Zero Visits</h2>
+      <div class="sub">Every field officer showing 0 visits for the latest date</div>
+    </div>
+    <div class="controls">
+      <select id="fosRsmFilter"><option value="">All RSMs</option></select>
+      <select id="fosSmFilter"><option value="">All SMs</option></select>
+      <input type="text" id="fosSearch" placeholder="Search FOS or SM…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="fosTable">
+      <thead>
+        <tr>
+          <th data-key="fos">FOS<span class="arrow"></span></th>
+          <th data-key="sm">SM<span class="arrow"></span></th>
+          <th data-key="rsm">RSM<span class="arrow"></span></th>
+          <th data-key="visits" class="num">Visits<span class="arrow"></span></th>
+          <th data-key="leads" class="num">Leads<span class="arrow"></span></th>
+          <th data-key="status">Status<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="fosBody"></tbody>
+    </table>
+  </div>
+  <div class="foot-note" id="fosFootNote"></div>
+</div>
+
+<!-- FOS FULL LIST TAB -->
+<div class="panel tab-content" id="tab-foslist" style="display:none;">
+  <div class="panel-head">
+    <div>
+      <h2>FOS List — Full</h2>
+      <div class="sub">Every field officer in the sheet, with live visits &amp; leads</div>
+    </div>
+    <div class="controls">
+      <select id="foslistRsmFilter"><option value="">All RSMs</option></select>
+      <select id="foslistSmFilter"><option value="">All SMs</option></select>
+      <select id="foslistStatusFilter">
+        <option value="">All Scenarios</option>
+        <option value="visits">Visits = 0 (Leads ≠ 0)</option>
+        <option value="leads">Leads = 0 (Visits ≠ 0)</option>
+        <option value="both">Visits + Leads = 0 (Both Zero)</option>
+        <option value="ok">Visits ≠ 0 &amp; Leads ≠ 0 (Active)</option>
+      </select>
+      <input type="text" id="foslistSearch" placeholder="Search FOS, SM or RSM…">
+    </div>
+  </div>
+  <div class="scenario-row" id="scenarioRow">
+    <div class="scenario-card" data-status="visits">
+      <div class="sc-n" id="scVisits">—</div>
+      <div class="sc-l">Visits = 0<span class="sc-sub">Leads ≠ 0</span></div>
+    </div>
+    <div class="scenario-card" data-status="leads">
+      <div class="sc-n" id="scLeads">—</div>
+      <div class="sc-l">Leads = 0<span class="sc-sub">Visits ≠ 0</span></div>
+    </div>
+    <div class="scenario-card danger" data-status="both">
+      <div class="sc-n" id="scBoth">—</div>
+      <div class="sc-l">Visits + Leads = 0<span class="sc-sub">Both zero</span></div>
+    </div>
+    <div class="scenario-card ok" data-status="ok">
+      <div class="sc-n" id="scOk">—</div>
+      <div class="sc-l">Active<span class="sc-sub">Visits ≠ 0 &amp; Leads ≠ 0</span></div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="foslistTable">
+      <thead>
+        <tr>
+          <th data-key="fos">FOS<span class="arrow"></span></th>
+          <th data-key="sm">SM<span class="arrow"></span></th>
+          <th data-key="rsm">RSM<span class="arrow"></span></th>
+          <th data-key="visits" class="num">Visits<span class="arrow"></span></th>
+          <th data-key="leads" class="num">Leads<span class="arrow"></span></th>
+          <th data-key="status">Status<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="foslistBody"></tbody>
+    </table>
+  </div>
+  <div class="foot-note" id="foslistFootNote"></div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const SHEET_ID = "1bctwfKldYNae7iEGN9RcCLuDkSUgE2o79eWYlAM11mQ";
+const GID = "1849898384"; // D-1 Defaulters List tab
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
+const REFRESH_MS = 5 * 60 * 1000; // auto refresh every 5 min
+
+// ============ STATE ============
+let RAW = [];      // FOS-level rows: {fos, sm, rsm, visits, leads}
+let dataAsOfLabel = "—";
+let rsmSort = {key:"zeroVisits", dir:-1};
+let smSort  = {key:"zeroVisits", dir:-1};
+let fosSort = {key:"fos", dir:1};
+let fosListSort = {key:"fos", dir:1};
+
+// ============ CSV PARSE ============
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field=""; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=""; }
+      else if(c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function normHeader(h){ return (h||"").trim().toLowerCase(); }
+
+function loadData(){
+  setStatus("load", "Loading live sheet…");
+  fetch(CSV_URL, {cache:"no-store"})
+    .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
+    .then(text => {
+      const rows = parseCSV(text);
+      // Row 0: dates (e.g. blank, blank, blank, 19/07/2026, 20/07/2026)
+      // Row 1: headers (FOS Name, SM, RSM, Visits, Leads)
+      // Row 2+: data
+      if(rows.length < 3) throw new Error("Sheet returned no data rows");
+
+      const dateRow = rows[0];
+      const headerRow = rows[1].map(normHeader);
+      const idx = {
+        fos: headerRow.findIndex(h => h.includes("fos")),
+        sm:  headerRow.findIndex(h => h === "sm"),
+        rsm: headerRow.findIndex(h => h === "rsm"),
+        visits: headerRow.findIndex(h => h.includes("visit")),
+        leads:  headerRow.findIndex(h => h.includes("lead")),
+      };
+      if(idx.fos === -1 || idx.sm === -1 || idx.rsm === -1 || idx.visits === -1 || idx.leads === -1){
+        throw new Error("Could not find expected columns (FOS Name / SM / RSM / Visits / Leads)");
+      }
+
+      // "data as of" = the date header sitting above the Visits column, else today
+      dataAsOfLabel = (dateRow[idx.visits] || dateRow[idx.leads] || "").trim() || "Latest";
+
+      const data = [];
+      for(let i=2;i<rows.length;i++){
+        const r = rows[i];
+        if(!r || r.length === 0) continue;
+        const fos = (r[idx.fos]||"").trim();
+        if(!fos) continue;
+        const sm = (r[idx.sm]||"").trim() || "Unmapped";
+        const rsm = (r[idx.rsm]||"").trim() || "Unmapped";
+        const visits = parseInt((r[idx.visits]||"0").trim(), 10);
+        const leads = parseInt((r[idx.leads]||"0").trim(), 10);
+        data.push({
+          fos, sm, rsm,
+          visits: isNaN(visits) ? 0 : visits,
+          leads: isNaN(leads) ? 0 : leads
+        });
+      }
+      if(data.length === 0) throw new Error("Parsed 0 valid FOS rows");
+
+      RAW = data;
+      document.getElementById("dataAsOf").textContent = dataAsOfLabel;
+      document.getElementById("lastRefreshed").textContent = new Date().toLocaleTimeString("en-IN", {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      setStatus("ok", "Live — connected to Google Sheet");
+      renderAll();
+    })
+    .catch(err => {
+      console.error(err);
+      setStatus("err", "Failed to load sheet: " + err.message);
+    });
+}
+
+function setStatus(kind, text){
+  const dot = document.getElementById("statusDot");
+  dot.className = "status-dot" + (kind === "ok" ? "" : kind === "err" ? " err" : " load");
+  document.getElementById("statusText").textContent = text;
+}
+
+// ============ AGGREGATION ============
+function aggregateBy(keyFn, includeRsm){
+  const map = new Map();
+  RAW.forEach(r => {
+    const key = keyFn(r);
+    if(!map.has(key)){
+      map.set(key, {
+        key,
+        rsm: includeRsm ? r.rsm : undefined,
+        sm: undefined,
+        fosCount:0, totalVisits:0, totalLeads:0,
+        zeroVisits:0, zeroLeads:0, zeroBoth:0
+      });
+    }
+    const g = map.get(key);
+    g.fosCount++;
+    g.totalVisits += r.visits;
+    g.totalLeads += r.leads;
+    if(r.visits === 0) g.zeroVisits++;
+    if(r.leads === 0) g.zeroLeads++;
+    if(r.visits === 0 && r.leads === 0) g.zeroBoth++;
+  });
+  return Array.from(map.values());
+}
+
+// ============ RENDER ============
+function renderAll(){
+  renderKPIs();
+  renderRSM();
+  renderSM();
+  renderFOS();
+  renderFOSList();
+  populateFilters();
+}
+
+function renderKPIs(){
+  const total = RAW.length;
+  const zv = RAW.filter(r=>r.visits===0).length;
+  const zl = RAW.filter(r=>r.leads===0).length;
+  const zb = RAW.filter(r=>r.visits===0 && r.leads===0).length;
+  const tv = RAW.reduce((s,r)=>s+r.visits,0);
+  const tl = RAW.reduce((s,r)=>s+r.leads,0);
+  document.getElementById("kpiTotal").textContent = total;
+  document.getElementById("kpiZeroVisits").textContent = zv;
+  document.getElementById("kpiZeroLeads").textContent = zl;
+  document.getElementById("kpiZeroBoth").textContent = zb;
+  document.getElementById("kpiTotalVisits").textContent = tv;
+  document.getElementById("kpiTotalLeads").textContent = tl;
+}
+
+function sortRows(rows, sortState){
+  const {key, dir} = sortState;
+  return rows.slice().sort((a,b)=>{
+    let av = a[key], bv = b[key];
+    if(typeof av === "string"){ av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    if(av < bv) return -1*dir;
+    if(av > bv) return 1*dir;
+    return 0;
+  });
+}
+
+function renderRSM(){
+  let rows = aggregateBy(r=>r.rsm, false).map(g=>({
+    rsm:g.key, fosCount:g.fosCount, totalVisits:g.totalVisits, totalLeads:g.totalLeads,
+    zeroVisits:g.zeroVisits, zeroLeads:g.zeroLeads, zeroBoth:g.zeroBoth,
+    zeroVisitsPct: g.fosCount ? Math.round((g.zeroVisits/g.fosCount)*100) : 0
+  }));
+  const search = (document.getElementById("rsmSearch").value||"").toLowerCase();
+  if(search) rows = rows.filter(r=>r.rsm.toLowerCase().includes(search));
+  rows = sortRows(rows, rsmSort);
+
+  const body = document.getElementById("rsmBody");
+  if(rows.length===0){ body.innerHTML = `<tr><td colspan="8"><div class="empty-state">No RSMs match your search.</div></td></tr>`; }
+  else{
+    body.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${escapeHtml(r.rsm)}</td>
+        <td class="num">${r.fosCount}</td>
+        <td class="num">${r.totalVisits}</td>
+        <td class="num">${r.totalLeads}</td>
+        <td class="num ${r.zeroVisits>0?'zero':''}">${r.zeroVisits}</td>
+        <td class="num ${r.zeroLeads>0?'zero':''}">${r.zeroLeads}</td>
+        <td class="num ${r.zeroBoth>0?'zero':''}">${r.zeroBoth}</td>
+        <td class="num">${pctPill(r.zeroVisitsPct)}</td>
+      </tr>
+    `).join("");
+  }
+  document.getElementById("rsmFootNote").textContent = `${rows.length} RSM(s) shown`;
+  updateSortIndicators("rsmTable", rsmSort);
+}
+
+function renderSM(){
+  const groups = new Map();
+  RAW.forEach(r=>{
+    const key = r.sm + "||" + r.rsm;
+    if(!groups.has(key)) groups.set(key, {sm:r.sm, rsm:r.rsm, fosCount:0, totalVisits:0, totalLeads:0, zeroVisits:0, zeroLeads:0, zeroBoth:0});
+    const g = groups.get(key);
+    g.fosCount++; g.totalVisits+=r.visits; g.totalLeads+=r.leads;
+    if(r.visits===0) g.zeroVisits++;
+    if(r.leads===0) g.zeroLeads++;
+    if(r.visits===0 && r.leads===0) g.zeroBoth++;
+  });
+  let rows = Array.from(groups.values());
+
+  const rsmFilter = document.getElementById("smRsmFilter").value;
+  if(rsmFilter) rows = rows.filter(r=>r.rsm===rsmFilter);
+  const search = (document.getElementById("smSearch").value||"").toLowerCase();
+  if(search) rows = rows.filter(r=>r.sm.toLowerCase().includes(search));
+  rows = sortRows(rows, smSort);
+
+  const body = document.getElementById("smBody");
+  if(rows.length===0){ body.innerHTML = `<tr><td colspan="8"><div class="empty-state">No SMs match your filters.</div></td></tr>`; }
+  else{
+    body.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${escapeHtml(r.sm)}</td>
+        <td>${escapeHtml(r.rsm)}</td>
+        <td class="num">${r.fosCount}</td>
+        <td class="num">${r.totalVisits}</td>
+        <td class="num">${r.totalLeads}</td>
+        <td class="num ${r.zeroVisits>0?'zero':''}">${r.zeroVisits}</td>
+        <td class="num ${r.zeroLeads>0?'zero':''}">${r.zeroLeads}</td>
+        <td class="num ${r.zeroBoth>0?'zero':''}">${r.zeroBoth}</td>
+      </tr>
+    `).join("");
+  }
+  document.getElementById("smFootNote").textContent = `${rows.length} SM(s) shown`;
+  updateSortIndicators("smTable", smSort);
+}
+
+function renderFOS(){
+  let rows = RAW.filter(r=>r.visits===0).map(r=>({
+    fos:r.fos, sm:r.sm, rsm:r.rsm, visits:r.visits, leads:r.leads,
+    status: r.leads===0 ? "Visits + Leads = 0" : "Visits = 0"
+  }));
+
+  const rsmFilter = document.getElementById("fosRsmFilter").value;
+  if(rsmFilter) rows = rows.filter(r=>r.rsm===rsmFilter);
+  const smFilter = document.getElementById("fosSmFilter").value;
+  if(smFilter) rows = rows.filter(r=>r.sm===smFilter);
+  const search = (document.getElementById("fosSearch").value||"").toLowerCase();
+  if(search) rows = rows.filter(r=>r.fos.toLowerCase().includes(search) || r.sm.toLowerCase().includes(search));
+  rows = sortRows(rows, fosSort);
+
+  const body = document.getElementById("fosBody");
+  if(rows.length===0){ body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No FOS with zero visits — great day!</div></td></tr>`; }
+  else{
+    body.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${escapeHtml(r.fos)}</td>
+        <td>${escapeHtml(r.sm)}</td>
+        <td>${escapeHtml(r.rsm)}</td>
+        <td class="num zero">${r.visits}</td>
+        <td class="num ${r.leads===0?'zero':'nonzero'}">${r.leads}</td>
+        <td>${r.leads===0 ? '<span class="pill bad">VISITS + LEADS = 0</span>' : '<span class="pill warn">VISITS = 0</span>'}</td>
+      </tr>
+    `).join("");
+  }
+  document.getElementById("fosFootNote").textContent = `${rows.length} FOS with zero visits shown`;
+  updateSortIndicators("fosTable", fosSort);
+}
+
+function renderFOSList(){
+  let rows = RAW.map(r=>{
+    let status;
+    if(r.visits===0 && r.leads===0) status = "both";
+    else if(r.visits===0) status = "visits";
+    else if(r.leads===0) status = "leads";
+    else status = "ok";
+    return {fos:r.fos, sm:r.sm, rsm:r.rsm, visits:r.visits, leads:r.leads, status};
+  });
+
+  // scenario counts computed on the RSM/SM-filtered set (before status filter/search) so cards reflect current scope
+  const rsmFilter0 = document.getElementById("foslistRsmFilter").value;
+  const smFilter0 = document.getElementById("foslistSmFilter").value;
+  let scopeRows = rows;
+  if(rsmFilter0) scopeRows = scopeRows.filter(r=>r.rsm===rsmFilter0);
+  if(smFilter0) scopeRows = scopeRows.filter(r=>r.sm===smFilter0);
+  document.getElementById("scVisits").textContent = scopeRows.filter(r=>r.status==="visits").length;
+  document.getElementById("scLeads").textContent = scopeRows.filter(r=>r.status==="leads").length;
+  document.getElementById("scBoth").textContent = scopeRows.filter(r=>r.status==="both").length;
+  document.getElementById("scOk").textContent = scopeRows.filter(r=>r.status==="ok").length;
+
+  const statusFilter = document.getElementById("foslistStatusFilter").value;
+  document.querySelectorAll(".scenario-card").forEach(card=>{
+    card.classList.toggle("active-filter", card.dataset.status === statusFilter);
+  });
+
+  const rsmFilter = rsmFilter0;
+  if(rsmFilter) rows = rows.filter(r=>r.rsm===rsmFilter);
+  const smFilter = smFilter0;
+  if(smFilter) rows = rows.filter(r=>r.sm===smFilter);
+  if(statusFilter) rows = rows.filter(r=>r.status===statusFilter);
+  const search = (document.getElementById("foslistSearch").value||"").toLowerCase();
+  if(search) rows = rows.filter(r=>
+    r.fos.toLowerCase().includes(search) ||
+    r.sm.toLowerCase().includes(search) ||
+    r.rsm.toLowerCase().includes(search)
+  );
+  rows = sortRows(rows, fosListSort);
+
+  const body = document.getElementById("foslistBody");
+  if(rows.length===0){ body.innerHTML = `<tr><td colspan="6"><div class="empty-state">No FOS match your filters.</div></td></tr>`; }
+  else{
+    const statusMap = {
+      both:  '<span class="pill bad">VISITS + LEADS = 0</span>',
+      visits:'<span class="pill warn">VISITS = 0</span>',
+      leads: '<span class="pill warn">LEADS = 0</span>',
+      ok:    '<span class="pill good">VISITS &amp; LEADS ≠ 0</span>'
+    };
+    body.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${escapeHtml(r.fos)}</td>
+        <td>${escapeHtml(r.sm)}</td>
+        <td>${escapeHtml(r.rsm)}</td>
+        <td class="num ${r.visits===0?'zero':'nonzero'}">${r.visits}</td>
+        <td class="num ${r.leads===0?'zero':'nonzero'}">${r.leads}</td>
+        <td>${statusMap[r.status]}</td>
+      </tr>
+    `).join("");
+  }
+  document.getElementById("foslistFootNote").textContent = `${rows.length} of ${RAW.length} FOS shown`;
+  updateSortIndicators("foslistTable", fosListSort);
+}
+
+function pctPill(pct){
+  const cls = pct >= 50 ? "bad" : pct >= 25 ? "warn" : "good";
+  return `<span class="pill ${cls}">${pct}%</span>`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function updateSortIndicators(tableId, sortState){
+  document.querySelectorAll(`#${tableId} thead th`).forEach(th=>{
+    const arrow = th.querySelector(".arrow");
+    if(!arrow) return;
+    if(th.dataset.key === sortState.key){
+      arrow.textContent = sortState.dir === 1 ? "▲" : "▼";
+    } else {
+      arrow.textContent = "";
+    }
+  });
+}
+
+function populateFilters(){
+  const rsms = Array.from(new Set(RAW.map(r=>r.rsm))).sort();
+  const sms = Array.from(new Set(RAW.map(r=>r.sm))).sort();
+  [document.getElementById("smRsmFilter"), document.getElementById("fosRsmFilter"), document.getElementById("foslistRsmFilter")].forEach(sel=>{
+    const current = sel.value;
+    sel.innerHTML = `<option value="">All RSMs</option>` + rsms.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+    sel.value = current;
+  });
+  const smSel = document.getElementById("foslistSmFilter");
+  const currentSm = smSel.value;
+  smSel.innerHTML = `<option value="">All SMs</option>` + sms.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  smSel.value = currentSm;
+
+  const fosSmSel = document.getElementById("fosSmFilter");
+  const currentFosSm = fosSmSel.value;
+  fosSmSel.innerHTML = `<option value="">All SMs</option>` + sms.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  fosSmSel.value = currentFosSm;
+}
+
+// ============ EVENTS ============
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-content").forEach(c=>c.style.display="none");
+    document.getElementById("tab-"+btn.dataset.tab).style.display="block";
+  });
+});
+
+document.querySelectorAll("#rsmTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    rsmSort = {key, dir: rsmSort.key===key ? -rsmSort.dir : 1};
+    renderRSM();
+  });
+});
+document.querySelectorAll("#smTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    smSort = {key, dir: smSort.key===key ? -smSort.dir : 1};
+    renderSM();
+  });
+});
+document.querySelectorAll("#fosTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    fosSort = {key, dir: fosSort.key===key ? -fosSort.dir : 1};
+    renderFOS();
+  });
+});
+
+document.querySelectorAll("#foslistTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    fosListSort = {key, dir: fosListSort.key===key ? -fosListSort.dir : 1};
+    renderFOSList();
+  });
+});
+
+document.getElementById("rsmSearch").addEventListener("input", renderRSM);
+document.getElementById("smSearch").addEventListener("input", renderSM);
+document.getElementById("smRsmFilter").addEventListener("change", renderSM);
+document.getElementById("fosSearch").addEventListener("input", renderFOS);
+document.getElementById("fosRsmFilter").addEventListener("change", renderFOS);
+document.getElementById("fosSmFilter").addEventListener("change", renderFOS);
+document.querySelectorAll(".scenario-card").forEach(card=>{
+  card.addEventListener("click", ()=>{
+    const sel = document.getElementById("foslistStatusFilter");
+    sel.value = (sel.value === card.dataset.status) ? "" : card.dataset.status;
+    renderFOSList();
+  });
+});
+
+document.getElementById("foslistSearch").addEventListener("input", renderFOSList);
+document.getElementById("foslistRsmFilter").addEventListener("change", renderFOSList);
+document.getElementById("foslistSmFilter").addEventListener("change", renderFOSList);
+document.getElementById("foslistStatusFilter").addEventListener("change", renderFOSList);
+
+// ============ INIT ============
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
